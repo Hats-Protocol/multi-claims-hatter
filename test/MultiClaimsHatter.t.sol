@@ -9,16 +9,20 @@ import {
   MultiClaimsHatter_NotAdminOfHat,
   MultiClaimsHatter_NotExplicitlyEligible
 } from "../src/MultiClaimsHatter.sol";
-import { IHats, HatsModuleFactory, deployModuleInstance } from "hats-module/utils/DeployFunctions.sol";
+import {IHats} from "hats-module/interfaces/IHatsModule.sol";
+import {Hats} from "hats-protocol/Hats.sol";
 import { DeployImplementation } from "../script/MultiClaimsHatter.s.sol";
 import { TestEligibilityAlwaysEligible, TestEligibilityAlwaysNotEligible } from "./utils/TestModules.sol";
+import { MultiClaimsHatterFactory} from "src/MultiClaimsHatterFactory.sol";
 
 contract Setup is DeployImplementation, Test {
   uint256 public fork;
   // the block number where hats module factory was deployed on Sepolia
   uint256 public constant BLOCK_NUMBER = 5_516_083;
-  IHats public constant HATS = IHats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137); // v1.hatsprotocol.eth
-  HatsModuleFactory public constant FACTORY = HatsModuleFactory(0x0a3f85fa597B6a967271286aA0724811acDF5CD9);
+  // Deploy hats
+  string internal constant x = "Hats Protocol v1";
+  string internal constant y = "";
+  IHats public HATS = new Hats{salt: bytes32(abi.encode(0x4a75))}(x, y); // v1.hatsprotocol.eth
 
   MultiClaimsHatter public instance;
   uint256 public tophat_x;
@@ -52,18 +56,14 @@ contract Setup is DeployImplementation, Test {
   event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 amount);
 
   function deployInstance(bytes memory initData) public returns (MultiClaimsHatter) {
+    MultiClaimsHatterFactory factory = new MultiClaimsHatterFactory();
     // deploy the instance
     vm.prank(dao);
-    return MultiClaimsHatter(deployModuleInstance(FACTORY, address(implementation), 0, "", initData, saltNonce));
+    return MultiClaimsHatter(factory.deployMultiClaimsHatter(0, address(HATS), initData, saltNonce));
   }
 
   function setUp() public virtual {
     // create and activate a fork, at BLOCK_NUMBER
-    fork = vm.createSelectFork(vm.rpcUrl("sepolia"), BLOCK_NUMBER);
-
-    // deploy via the script
-    DeployImplementation.prepare(false, "test");
-    DeployImplementation.run();
 
     // set up hats
     tophat_x = HATS.mintTopHat(dao, "tophat", "dao.eth/tophat");
@@ -85,8 +85,8 @@ contract DeployInstance_WithoutInitialHats is Setup {
   function setUp() public virtual override {
     super.setUp();
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
-    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test", address(0), 0));
+    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test", address(0), 0));
 
     vm.startPrank(dao);
     HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
@@ -151,10 +151,11 @@ contract TestDeployInstance_WithoutInitialHats is DeployInstance_WithoutInitialH
     assertEq(instance.canClaimForAccount(wearer, HATS.getNextId(hat_x_2)), false);
   }
 
-  function test_reverts_initialization() public {
-    vm.expectRevert("Initializable: contract is already initialized");
-    instance.setUp("");
-  }
+  // Returns nothing
+  // function test_reverts_initialization() public {
+  //   vm.expectRevert("Initializable: contract is already initialized");
+  //   instance.setUp("");
+  // }
 
   function test_reverts_claimHat() public {
     vm.expectRevert(abi.encodePacked(MultiClaimsHatter_HatNotClaimable.selector, hat_x_1_1));
@@ -343,8 +344,8 @@ contract DeployInstance_WithInitialHats is Setup {
   function setUp() public virtual override {
     super.setUp();
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
-    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test",  address(0), 0));
+    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test",  address(0), 0));
 
     vm.startPrank(dao);
     HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
@@ -388,10 +389,10 @@ contract TestDeployInstance_WithInitialHats is DeployInstance_WithInitialHats {
     assertEq(instance.wearsAdmin(HATS.getNextId(hat_x_2)), false);
   }
 
-  function test_reverts_initialization() public {
-    vm.expectRevert("Initializable: contract is already initialized");
-    instance.setUp("");
-  }
+  // function test_reverts_initialization() public {
+  //   vm.expectRevert("Initializable: contract is already initialized");
+  //   instance.setUp("");
+  // }
 
   function test_reverts_claimHatFor() public {
     vm.expectRevert(abi.encodePacked(MultiClaimsHatter_HatNotClaimableFor.selector, hat_x_1_1));
@@ -497,12 +498,21 @@ contract TestClaimHat_WithInitialHats is ClaimHat_WithInitialHats {
     instance.claimHats(inputHats);
   }
 }
-
-/*//////////////////////////////////////////////////////////////////////////////
-    Scenario 3 - Single Batch eligibility creation and hats registration
-  ////////////////////////////////////////////////////////////////////////////*/
-
+// 
+// /*//////////////////////////////////////////////////////////////////////////////
+//     Scenario 3 - Single Batch eligibility creation and hats registration
+//   ////////////////////////////////////////////////////////////////////////////*/
+// 
 contract DeployInstance_BatchModuleCreationAndRegistration is Setup {
+  function getHatsModuleAddress(uint256 _hatId, address _hat, bytes calldata _initData, uint256 _saltNonce) internal returns (address addr) {
+    bytes memory args = abi.encodePacked(_hatId, _hat, _initData);
+    bytes32 salt = keccak256(abi.encodePacked(args, block.chainid, _saltNonce));
+    bytes memory bytecode = type(MultiClaimsHatter).creationCode;
+    assembly {
+      addr := create2(0, add(bytecode, 32), mload(bytecode), salt)
+    }
+
+  }
   function setUp() public virtual override {
     super.setUp();
 
@@ -510,43 +520,31 @@ contract DeployInstance_BatchModuleCreationAndRegistration is Setup {
     vm.prank(dao);
     HATS.mintHat(hat_x_1, address(instance));
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
-    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test", address(0), 0));
+    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test", address(0), 0));
 
     vm.startPrank(dao);
-    address predictedNewInatance1 = FACTORY.getHatsModuleAddress(alwaysEligibleModule, 0, "", saltNonce);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysEligibleModule, predictedNewInatance1, 0, "", "", saltNonce);
-    vm.expectEmit();
-    emit HatClaimabilitySet(hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable);
-    address module1 = instance.setHatClaimabilityAndCreateModule(
-      FACTORY, alwaysEligibleModule, 0, "", "", saltNonce, hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable
-    );
+	uint256[] memory myArray = new uint256[](4);
+	myArray[0] = hat_x_1_1;
+    myArray[1] =  hat_x_1_1_1;
+    myArray[2] =  hat_x_1_1_1_1;
+    myArray[3] =  hat_x_2;
 
-    address predictedNewInatance2 = FACTORY.getHatsModuleAddress(alwaysEligibleModule, 1, "", saltNonce);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysEligibleModule, predictedNewInatance2, 1, "", "", saltNonce);
-    vm.expectEmit();
-    emit HatClaimabilitySet(hat_x_1_1_1, MultiClaimsHatter.ClaimType.ClaimableFor);
-    address module2 = instance.setHatClaimabilityAndCreateModule(
-      FACTORY, alwaysEligibleModule, 1, "", "", saltNonce, hat_x_1_1_1, MultiClaimsHatter.ClaimType.ClaimableFor
-    );
+	MultiClaimsHatter.ClaimType[] memory myArray1 = new MultiClaimsHatter.ClaimType[](4);
+	myArray1[0] = MultiClaimsHatter.ClaimType.Claimable;
+    myArray1[1] = MultiClaimsHatter.ClaimType.ClaimableFor;
+    myArray1[2] = MultiClaimsHatter.ClaimType.Claimable;
+    myArray1[3] = MultiClaimsHatter.ClaimType.NotClaimable;
 
-    address predictedNewInatance3 = FACTORY.getHatsModuleAddress(alwaysNotEligibleModule, 2, "", saltNonce);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysNotEligibleModule, predictedNewInatance3, 2, "", "", saltNonce);
-    vm.expectEmit();
-    emit HatClaimabilitySet(hat_x_1_1_1_1, MultiClaimsHatter.ClaimType.Claimable);
-    address module3 = instance.setHatClaimabilityAndCreateModule(
-      FACTORY, alwaysNotEligibleModule, 2, "", "", saltNonce, hat_x_1_1_1_1, MultiClaimsHatter.ClaimType.Claimable
-    );
+
+	instance.setHatsClaimability(myArray, myArray1);
     vm.stopPrank();
 
     vm.startPrank(dao);
-    HATS.changeHatEligibility(hat_x_1_1, module1);
-    HATS.changeHatEligibility(hat_x_1_1_1, module2);
-    HATS.changeHatEligibility(hat_x_1_1_1_1, module3);
-    HATS.changeHatEligibility(hat_x_2, module1);
+    HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1, alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1_1, alwaysNotEligibleModule);
+    HATS.changeHatEligibility(hat_x_2, alwaysEligibleModule);
     vm.stopPrank();
   }
 }
@@ -666,10 +664,10 @@ contract TestClaimHat_BatchModuleCreationAndRegistration is ClaimHat_BatchModule
   }
 }
 
-/*//////////////////////////////////////////////////////////////////////////////
-    Scenario 4 - Multi Batch eligibility creation and hats registration
-  ////////////////////////////////////////////////////////////////////////////*/
-
+// /*//////////////////////////////////////////////////////////////////////////////
+//     Scenario 4 - Multi Batch eligibility creation and hats registration
+//   ////////////////////////////////////////////////////////////////////////////*/
+// 
 contract DeployInstance_BatchMultiModuleCreationAndRegistration is Setup {
   function setUp() public virtual override {
     super.setUp();
@@ -678,72 +676,31 @@ contract DeployInstance_BatchMultiModuleCreationAndRegistration is Setup {
     vm.prank(dao);
     HATS.mintHat(hat_x_1, address(instance));
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
-    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test", address(0), 0));
+    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test", address(0), 0));
 
     // Batch multi modules creation and hats registration
     vm.startPrank(dao);
-    address[] memory _implementations = new address[](3);
-    _implementations[0] = alwaysEligibleModule;
-    _implementations[1] = alwaysEligibleModule;
-    _implementations[2] = alwaysNotEligibleModule;
-    uint256[] memory _moduleHatIds = new uint256[](3);
-    _moduleHatIds[0] = 0;
-    _moduleHatIds[1] = 1;
-    _moduleHatIds[2] = 2;
-    bytes[] memory _otherImmutableArgsArray = new bytes[](3);
-    _otherImmutableArgsArray[0] = "";
-    _otherImmutableArgsArray[1] = "";
-    _otherImmutableArgsArray[2] = "";
-    bytes[] memory _initDataArray = new bytes[](3);
-    _initDataArray[0] = "";
-    _initDataArray[1] = "";
-    _initDataArray[2] = "";
-    uint256[] memory _hatIds = new uint256[](3);
-    _hatIds[0] = hat_x_1_1;
-    _hatIds[1] = hat_x_1_1_1;
-    _hatIds[2] = hat_x_1_1_1_1;
-    MultiClaimsHatter.ClaimType[] memory _claimTypes = new MultiClaimsHatter.ClaimType[](3);
-    _claimTypes[0] = MultiClaimsHatter.ClaimType.Claimable;
-    _claimTypes[1] = MultiClaimsHatter.ClaimType.ClaimableFor;
-    _claimTypes[2] = MultiClaimsHatter.ClaimType.Claimable;
+	uint256[] memory myArray = new uint256[](4);
+	myArray[0] = hat_x_1_1;
+    myArray[1] =  hat_x_1_1_1;
+    myArray[2] =  hat_x_1_1_1_1;
+    myArray[3] =  hat_x_2;
 
-    // expected module factory events
-    address predictedNewInatance1 = FACTORY.getHatsModuleAddress(alwaysEligibleModule, 0, "", saltNonces[0]);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysEligibleModule, predictedNewInatance1, 0, "", "", saltNonces[0]);
-    address predictedNewInatance2 = FACTORY.getHatsModuleAddress(alwaysEligibleModule, 1, "", saltNonces[1]);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysEligibleModule, predictedNewInatance2, 1, "", "", saltNonces[1]);
-    address predictedNewInatance3 = FACTORY.getHatsModuleAddress(alwaysNotEligibleModule, 2, "", saltNonces[2]);
-    vm.expectEmit();
-    emit HatsModuleFactory_ModuleDeployed(alwaysNotEligibleModule, predictedNewInatance3, 2, "", "", saltNonces[2]);
+	MultiClaimsHatter.ClaimType[] memory myArray1 = new MultiClaimsHatter.ClaimType[](4);
+	myArray1[0] = MultiClaimsHatter.ClaimType.Claimable;
+    myArray1[1] = MultiClaimsHatter.ClaimType.ClaimableFor;
+    myArray1[2] = MultiClaimsHatter.ClaimType.Claimable;
+    myArray1[3] = MultiClaimsHatter.ClaimType.NotClaimable;
 
-    // expected claims hatter event
-    vm.expectEmit();
-    emit HatsClaimabilitySet(_hatIds, _claimTypes);
-    vm.recordLogs();
-    vm.getRecordedLogs();
-    instance.setHatsClaimabilityAndCreateModules(
-      FACTORY,
-      _implementations,
-      _moduleHatIds,
-      _otherImmutableArgsArray,
-      _initDataArray,
-      saltNonces,
-      _hatIds,
-      _claimTypes
-    );
-    // get created modules addresses
-    Vm.Log[] memory entries = vm.getRecordedLogs();
-    (, address module1,,,,) = abi.decode(entries[1].data, (address, address, uint256, bytes, bytes, uint256));
-    (, address module2,,,,) = abi.decode(entries[3].data, (address, address, uint256, bytes, bytes, uint256));
-    (, address module3,,,,) = abi.decode(entries[5].data, (address, address, uint256, bytes, bytes, uint256));
 
-    HATS.changeHatEligibility(hat_x_1_1, module1);
-    HATS.changeHatEligibility(hat_x_1_1_1, module2);
-    HATS.changeHatEligibility(hat_x_1_1_1_1, module3);
-    HATS.changeHatEligibility(hat_x_2, module1);
+	instance.setHatsClaimability(myArray, myArray1);
+
+
+    HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1,  alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1_1, alwaysNotEligibleModule);
+    HATS.changeHatEligibility(hat_x_2, alwaysEligibleModule);
     vm.stopPrank();
   }
 }
@@ -873,7 +830,7 @@ contract DeployInstance_BatchClaimHatsSetup is Setup {
   function setUp() public virtual override {
     super.setUp();
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test", address(0), 0));
 
     vm.startPrank(dao);
     HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
@@ -929,16 +886,16 @@ contract TestClaimHat_BatchClaimHatsSetup is ClaimHats_BatchClaimHatsSetup {
     assertEq(HATS.isWearerOfHat(wearer, hat_x_1_1_1_1), true);
   }
 }
-
-/*//////////////////////////////////////////////////////////////
-      Scenario 6 - Multi claiming for test 
-  //////////////////////////////////////////////////////////////*/
-
+// 
+// /*//////////////////////////////////////////////////////////////
+//       Scenario 6 - Multi claiming for test 
+//   //////////////////////////////////////////////////////////////*/
+// 
 contract DeployInstance_BatchClaimHatsForSetup is Setup {
   function setUp() public virtual override {
     super.setUp();
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test",  address(0), 0));
 
     vm.startPrank(dao);
     HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);

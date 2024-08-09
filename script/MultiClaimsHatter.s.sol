@@ -3,12 +3,12 @@ pragma solidity ^0.8.19;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { MultiClaimsHatter } from "../src/MultiClaimsHatter.sol";
-import { HatsModuleFactory } from "hats-module/HatsModuleFactory.sol";
+// import { HatsModuleFactory } from "hats-module/HatsModuleFactory.sol";
 
 contract DeployInstance is Script {
   address public implementation = 0xB985eA1be961f7c4A4C45504444C02c88c4fdEF9;
   address public instance;
-  HatsModuleFactory public factory = HatsModuleFactory(0xfE661c01891172046feE16D3a57c3Cf456729efA);
+  // HatsModuleFactory public factory = HatsModuleFactory(0xfE661c01891172046feE16D3a57c3Cf456729efA);
   bytes32 public SALT = bytes32(abi.encode(0x4a75));
   uint256 public SALT_NONCE = 1;
 
@@ -36,13 +36,13 @@ contract DeployInstance is Script {
   function run() public virtual {
     vm.startBroadcast(deployer());
 
-    instance = factory.createHatsModule(
-      implementation,
-      26_960_769_425_706_402_133_074_773_335_446_698_772_097_302_206_575_744_715_499_319_066_624,
-      abi.encodePacked(),
-      createInitData(),
-      SALT_NONCE
-    );
+    // instance = factory.createHatsModule(
+    //   implementation,
+    //   26_960_769_425_706_402_133_074_773_335_446_698_772_097_302_206_575_744_715_499_319_066_624,
+    //   abi.encodePacked(),
+    //   createInitData(),
+    //   SALT_NONCE
+    // );
 
     vm.stopBroadcast();
 
@@ -89,7 +89,7 @@ contract DeployImplementation is Script {
      *       never differs regardless of where its being compiled
      *    2. The provided salt, `SALT`
      */
-    implementation = new MultiClaimsHatter{ salt: SALT }(_version /* insert constructor args here */ );
+    // implementation = new MultiClaimsHatter{ salt: SALT }(_version /* insert constructor args here */ );
 
     vm.stopBroadcast();
 

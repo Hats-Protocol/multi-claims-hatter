@@ -6,7 +6,7 @@ import { HatsEligibilityModule } from "hats-module/HatsEligibilityModule.sol";
 import { HatsModule } from "hats-module/HatsModule.sol";
 
 contract TestEligibilityAlwaysEligible is HatsEligibilityModule {
-  constructor(string memory _version) HatsModule(_version) { }
+  constructor(string memory _version, address _hat, uint256 _hatId) HatsModule(_version, _hat, _hatId) { }
 
   function getWearerStatus(address, /* _wearer */ uint256 /* _hatId */ )
     public
@@ -19,7 +19,7 @@ contract TestEligibilityAlwaysEligible is HatsEligibilityModule {
 }
 
 contract TestEligibilityAlwaysNotEligible is HatsEligibilityModule {
-  constructor(string memory _version) HatsModule(_version) { }
+  constructor(string memory _version, address _hat, uint256 _hatId) HatsModule(_version, _hat, _hatId) { }
 
   function getWearerStatus(address, /* _wearer */ uint256 /* _hatId */ )
     public

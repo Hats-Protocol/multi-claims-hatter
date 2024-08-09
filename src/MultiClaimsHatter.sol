@@ -3,7 +3,6 @@ pragma solidity ^0.8.19;
 
 // import { console2 } from "forge-std/Test.sol"; // remove before deploy
 import { HatsModule } from "hats-module/HatsModule.sol";
-import { HatsModuleFactory } from "hats-module/HatsModuleFactory.sol";
 
 /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
@@ -84,7 +83,7 @@ contract MultiClaimsHatter is HatsModule {
 
   /// @notice Deploy the implementation contract and set its version
   /// @dev This is only used to deploy the implementation contract, and should not be used to deploy clones
-  constructor(string memory _version) HatsModule(_version) { }
+  constructor(string memory _version, address _hats, uint256 _hatId) HatsModule(_version, _hats, _hatId) { }
 
   /*//////////////////////////////////////////////////////////////
                             INITIALIZOR
@@ -136,83 +135,6 @@ contract MultiClaimsHatter is HatsModule {
         ++i;
       }
     }
-
-    emit HatsClaimabilitySet(_hatIds, _claimTypes);
-  }
-
-  /**
-   * @notice Wrapper around a HatsModuleFactory. Deploys a new HatsModule instance and sets a hat's claimability type.
-   * @param _factory The HatsModuleFactory instance that will deploy the module
-   * @param _implementation The address of the implementation contract of which to deploy a clone
-   * @param _moduleHatId The hat for which to deploy a HatsModule.
-   * @param _otherImmutableArgs Other immutable args to pass to the clone as immutable storage.
-   * @param _initData The encoded data to pass to the `setUp` function of the new HatsModule instance. Leave empty if
-   * none.
-   * @param _saltNonce The nonce to use when calculating the salt
-   * @param _hatId The ID of the hat to set claimability for
-   * @param _claimType New claimability type for the hat
-   * @return _instance The address of the deployed HatsModule instance
-   */
-  function setHatClaimabilityAndCreateModule(
-    HatsModuleFactory _factory,
-    address _implementation,
-    uint256 _moduleHatId,
-    bytes calldata _otherImmutableArgs,
-    bytes calldata _initData,
-    uint256 _saltNonce,
-    uint256 _hatId,
-    ClaimType _claimType
-  ) public returns (address _instance) {
-    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
-
-    hatToClaimType[_hatId] = _claimType;
-
-    _instance = _factory.createHatsModule(_implementation, _moduleHatId, _otherImmutableArgs, _initData, _saltNonce);
-
-    emit HatClaimabilitySet(_hatId, _claimType);
-  }
-
-  /**
-   * @notice Wrapper around a HatsModuleFactory. Deploys new HatsModule instances and sets the claimability type of
-   * multiple hats.
-   * @param _factory The HatsModuleFactory instance that will deploy the modules
-   * @param _implementations The addresses of the implementation contracts of which to deploy a clone
-   * @param _moduleHatIds The hats for which to deploy a HatsModule.
-   * @param _otherImmutableArgsArray Other immutable args to pass to the clones as immutable storage.
-   * @param _initDataArray The encoded data to pass to the `setUp` functions of the new HatsModule instances.
-   * @param _saltNonces The nonces to use when calculating the salt for each module
-   * @param _hatIds The IDs of the hats to set claimability for
-   * @param _claimTypes New claimability types for each hat
-   * @return success True if all modules were successfully created and the claimability types were set
-   */
-  function setHatsClaimabilityAndCreateModules(
-    HatsModuleFactory _factory,
-    address[] calldata _implementations,
-    uint256[] calldata _moduleHatIds,
-    bytes[] calldata _otherImmutableArgsArray,
-    bytes[] calldata _initDataArray,
-    uint256[] memory _saltNonces,
-    uint256[] memory _hatIds,
-    ClaimType[] memory _claimTypes
-  ) public returns (bool success) {
-    uint256 length = _hatIds.length;
-    if (_claimTypes.length != length) {
-      revert MultiClaimsHatter_ArrayLengthMismatch();
-    }
-
-    uint256 hatId;
-    for (uint256 i; i < length;) {
-      hatId = _hatIds[i];
-      if (!HATS().isAdminOfHat(msg.sender, hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, hatId);
-      hatToClaimType[hatId] = _claimTypes[i];
-      unchecked {
-        ++i;
-      }
-    }
-
-    success = _factory.batchCreateHatsModule(
-      _implementations, _moduleHatIds, _otherImmutableArgsArray, _initDataArray, _saltNonces
-    );
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
   }

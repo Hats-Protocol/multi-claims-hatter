@@ -217,11 +217,7 @@ contract MultiClaimsHatter is HatsModule {
    * @param _hatId The ID of the hat to claim
    */
   function claimHat(uint256 _hatId) public {
-    if (hatToClaimType[_hatId] == ClaimType.NotClaimable) {
-      revert MultiClaimsHatter_HatNotClaimable(_hatId);
-    }
-
-    _mint(_hatId, msg.sender);
+    _claimHat(_hatId);
   }
 
   /**
@@ -230,14 +226,8 @@ contract MultiClaimsHatter is HatsModule {
    * @param _hatIds The IDs of the hats to claim
    */
   function claimHats(uint256[] calldata _hatIds) public {
-    uint256 hatId;
     for (uint256 i; i < _hatIds.length;) {
-      hatId = _hatIds[i];
-      if (hatToClaimType[hatId] == ClaimType.NotClaimable) {
-        revert MultiClaimsHatter_HatNotClaimable(hatId);
-      }
-
-      _mint(hatId, msg.sender);
+      _claimHat(_hatIds[i]);
 
       unchecked {
         ++i;
@@ -252,11 +242,7 @@ contract MultiClaimsHatter is HatsModule {
    * @param _account The account for which to claim
    */
   function claimHatFor(uint256 _hatId, address _account) public {
-    if (hatToClaimType[_hatId] != ClaimType.ClaimableFor) {
-      revert MultiClaimsHatter_HatNotClaimableFor(_hatId);
-    }
-
-    _mint(_hatId, _account);
+    _claimHatFor(_hatId, _account);
   }
 
   /**
@@ -270,14 +256,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    uint256 hatId;
     for (uint256 i; i < _hatIds.length;) {
-      hatId = _hatIds[i];
-      if (hatToClaimType[hatId] != ClaimType.ClaimableFor) {
-        revert MultiClaimsHatter_HatNotClaimableFor(hatId);
-      }
-
-      _mint(hatId, _accounts[i]);
+      _claimHatFor(_hatIds[i], _accounts[i]);
 
       unchecked {
         ++i;
@@ -345,6 +325,22 @@ contract MultiClaimsHatter is HatsModule {
     if (!_isExplicitlyEligible(_hatId, _account)) revert MultiClaimsHatter_NotExplicitlyEligible(_account, _hatId);
     // mint the hat to _wearer if eligible. This contract can mint as long as its the hat's admin.
     HATS().mintHat(_hatId, _account);
+  }
+
+  function _claimHat(uint256 _hatId) internal {
+    if (hatToClaimType[_hatId] == ClaimType.NotClaimable) {
+      revert MultiClaimsHatter_HatNotClaimable(_hatId);
+    }
+
+    _mint(_hatId, msg.sender);
+  }
+
+  function _claimHatFor(uint256 _hatId, address _account) internal {
+    if (hatToClaimType[_hatId] != ClaimType.ClaimableFor) {
+      revert MultiClaimsHatter_HatNotClaimableFor(_hatId);
+    }
+
+    _mint(_hatId, _account);
   }
 
   function _isExplicitlyEligible(uint256 _hatId, address _account) internal view returns (bool eligible) {

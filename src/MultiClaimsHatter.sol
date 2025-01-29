@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 // import { console2 } from "forge-std/Test.sol"; // remove before deploy
 import { HatsModule } from "hats-module/HatsModule.sol";
 import { HatsModuleFactory } from "hats-module/HatsModuleFactory.sol";
+import { IHatMintHook } from "./interfaces/IHatMintHook.sol";
 
 /*//////////////////////////////////////////////////////////////
                             CUSTOM ERRORS
@@ -19,6 +20,8 @@ error MultiClaimsHatter_NotExplicitlyEligible(address account, uint256 hatId);
 error MultiClaimsHatter_HatNotClaimable(uint256 hatId);
 /// @notice Thrown if the hat is not claimable on behalf of accounts
 error MultiClaimsHatter_HatNotClaimableFor(uint256 hatId);
+/// @notice Thrown if the mint hook failed
+error MultiClaimsHatter_MintHookFailed(uint256 hatId);
 
 contract MultiClaimsHatter is HatsModule {
   /*//////////////////////////////////////////////////////////////
@@ -29,6 +32,8 @@ contract MultiClaimsHatter is HatsModule {
   event HatsClaimabilitySet(uint256[] hatIds, ClaimType[] claimTypes);
   /// @notice Emitted when the calimability of a hat was edited
   event HatClaimabilitySet(uint256 hatId, ClaimType claimType);
+  /// @notice Emitted when a mint hook is set for a hat
+  event MintHookSet(uint256 hatId, address mintHook);
 
   /*//////////////////////////////////////////////////////////////
                             DATA MODELS
@@ -94,9 +99,24 @@ contract MultiClaimsHatter is HatsModule {
   function _setUp(bytes calldata _initData) internal override {
     if (_initData.length == 0) return;
 
-    // decode init data
+    // decode first two required arrays
     (uint256[] memory _hatIds, ClaimType[] memory _claimTypes) = abi.decode(_initData, (uint256[], ClaimType[]));
+
+    // set the claimability
     _setHatsClaimabilityMemory(_hatIds, _claimTypes);
+
+    // check if there's data for _mintHooks and set them if so
+    /// @dev Since there are two preceeding dynamic arrays, we need:
+    /// - 2 * 32 bytes for the dynamic array offsets
+    /// - For each dynamicarray:
+    ///   - 32 bytes for the length
+    ///   - length * 32 bytes for the actual data
+    uint256 arrayLength = _hatIds.length;
+    uint256 mintHooksStart = 64 + (32 + (arrayLength * 32)) + (32 + (arrayLength * 32));
+    if (_initData.length > mintHooksStart) {
+      (,, address[] memory _mintHooks) = abi.decode(_initData, (uint256[], ClaimType[], address[]));
+      _setMintHooksMemory(_hatIds, _mintHooks);
+    }
   }
 
   /*//////////////////////////////////////////////////////////////
@@ -221,6 +241,15 @@ contract MultiClaimsHatter is HatsModule {
   }
 
   /**
+   * @notice Claim a hat and call its mint hook. Will revert if the mint hook fails.
+   * @param _hatId The ID of the hat to claim
+   * @param _hookData The data to pass to the mint hook
+   */
+  function claimHatWithHook(uint256 _hatId, bytes calldata _hookData) public {
+    _claimHatWithHook(_hatId, _hookData);
+  }
+
+  /**
    * @notice Claim multiple hats.
    * @dev This contract must be wearing an admin hat of the hats to claim or else it will revert
    * @param _hatIds The IDs of the hats to claim
@@ -243,6 +272,16 @@ contract MultiClaimsHatter is HatsModule {
    */
   function claimHatFor(uint256 _hatId, address _account) public {
     _claimHatFor(_hatId, _account);
+  }
+
+  /**
+   * @notice Claim a hat on behalf of an account and call its mint hook. Will revert if the mint hook fails.
+   * @param _hatId The ID of the hat to claim for
+   * @param _account The account for which to claim
+   * @param _hookData The data to pass to the mint hook
+   */
+  function claimHatForWithHook(uint256 _hatId, address _account, bytes calldata _hookData) public {
+    _claimHatForWithHook(_hatId, _account, _hookData);
   }
 
   /**
@@ -327,6 +366,12 @@ contract MultiClaimsHatter is HatsModule {
     HATS().mintHat(_hatId, _account);
   }
 
+  function _callMintHook(uint256 _hatId, address _account, bytes calldata _hookData) internal {
+    if (!IHatMintHook(hatToMintHook[_hatId]).onHatMinted(_hatId, _account, _hookData)) {
+      revert MultiClaimsHatter_MintHookFailed(_hatId);
+    }
+  }
+
   function _claimHat(uint256 _hatId) internal {
     if (hatToClaimType[_hatId] == ClaimType.NotClaimable) {
       revert MultiClaimsHatter_HatNotClaimable(_hatId);
@@ -335,12 +380,22 @@ contract MultiClaimsHatter is HatsModule {
     _mint(_hatId, msg.sender);
   }
 
+  function _claimHatWithHook(uint256 _hatId, bytes calldata _hookData) internal {
+    _claimHat(_hatId);
+    _callMintHook(_hatId, msg.sender, _hookData);
+  }
+
   function _claimHatFor(uint256 _hatId, address _account) internal {
     if (hatToClaimType[_hatId] != ClaimType.ClaimableFor) {
       revert MultiClaimsHatter_HatNotClaimableFor(_hatId);
     }
 
     _mint(_hatId, _account);
+  }
+
+  function _claimHatForWithHook(uint256 _hatId, address _account, bytes calldata _hookData) internal {
+    _claimHatFor(_hatId, _account);
+    _callMintHook(_hatId, _account, _hookData);
   }
 
   function _isExplicitlyEligible(uint256 _hatId, address _account) internal view returns (bool eligible) {
@@ -386,6 +441,14 @@ contract MultiClaimsHatter is HatsModule {
     hatToClaimType[_hatId] = _claimType;
   }
 
+  /// @dev Internal function to set the mint hook of a hat, without admin check. Does emit an event.
+  /// @param _hatId The ID of the hat to set the mint hook for
+  /// @param _mintHook The address of the mint hook to set
+  function _setMintHook(uint256 _hatId, address _mintHook) internal {
+    hatToMintHook[_hatId] = _mintHook;
+    emit MintHookSet(_hatId, _mintHook);
+  }
+
   function _setHatsClaimabilityMemory(uint256[] memory _hatIds, ClaimType[] memory _claimTypes) internal {
     uint256 length = _hatIds.length;
     if (_claimTypes.length != length) {
@@ -402,6 +465,25 @@ contract MultiClaimsHatter is HatsModule {
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
+  }
+
+  function _setMintHooksMemory(uint256[] memory _hatIds, address[] memory _mintHooks) internal {
+    console2.log("setting mint hooks");
+    uint256 length = _hatIds.length;
+    if (_mintHooks.length != length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < length;) {
+      // set the mint hook if it is not the zero address
+      if (_mintHooks[i] != address(0)) {
+        console2.log("setting mint hook for hat", _hatIds[i]);
+        _setMintHook(_hatIds[i], _mintHooks[i]);
+      }
+      unchecked {
+        ++i;
+      }
+    }
   }
 
   /// @dev Internal function that reverts if the caller is not an admin of a hat

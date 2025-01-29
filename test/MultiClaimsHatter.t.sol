@@ -12,6 +12,7 @@ import {
 import { IHats, HatsModuleFactory, deployModuleInstance } from "hats-module/utils/DeployFunctions.sol";
 import { DeployImplementation } from "../script/MultiClaimsHatter.s.sol";
 import { TestEligibilityAlwaysEligible, TestEligibilityAlwaysNotEligible } from "./utils/TestModules.sol";
+import { AlwaysSucceedsMintHook, AlwaysFailsMintHook } from "./utils/TestMintHooks.sol";
 
 contract Setup is DeployImplementation, Test {
   uint256 public fork;
@@ -42,6 +43,7 @@ contract Setup is DeployImplementation, Test {
   // MultiClaimsHatter events
   event HatsClaimabilitySet(uint256[] hatIds, MultiClaimsHatter.ClaimType[] claimTypes);
   event HatClaimabilitySet(uint256 hatId, MultiClaimsHatter.ClaimType claimType);
+  event MintHookSet(uint256 hatId, address mintHook);
 
   // HatsModuleFactory event
   event HatsModuleFactory_ModuleDeployed(
@@ -337,7 +339,7 @@ contract TestClaimHat_WithoutInitialHats is ClaimHat_WithoutInitialHats {
 
 /*//////////////////////////////////////////////////////////////
       Scenario 2 - Delpoy Claims Hatter with initial hats
-  //////////////////////////////////////////////////////////////*/
+//////////////////////////////////////////////////////////////*/
 
 contract DeployInstance_WithInitialHats is Setup {
   function setUp() public virtual override {
@@ -495,6 +497,60 @@ contract TestClaimHat_WithInitialHats is ClaimHat_WithInitialHats {
     inputHats = [hat_x_1_1_1_1];
     vm.prank(wearer);
     instance.claimHats(inputHats);
+  }
+}
+
+/*//////////////////////////////////////////////////////////////////////////////
+    Scenario 2B - Deploy Claims Hatter with initial hats and mint hooks
+////////////////////////////////////////////////////////////////////////////*/
+
+contract DeployInstance_WithInitialHatsAndMintHooks is Setup {
+  AlwaysSucceedsMintHook public alwaysSucceedsMintHook;
+  AlwaysFailsMintHook public alwaysFailsMintHook;
+
+  function setUp() public virtual override {
+    super.setUp();
+
+    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
+    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    alwaysSucceedsMintHook = new AlwaysSucceedsMintHook();
+    alwaysFailsMintHook = new AlwaysFailsMintHook();
+
+    vm.startPrank(dao);
+    HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1, alwaysEligibleModule);
+    HATS.changeHatEligibility(hat_x_1_1_1_1, alwaysNotEligibleModule);
+    HATS.changeHatEligibility(hat_x_2, alwaysEligibleModule);
+    vm.stopPrank();
+
+    uint256[] memory initialHats = new uint256[](3);
+    MultiClaimsHatter.ClaimType[] memory initialClaimTypes = new MultiClaimsHatter.ClaimType[](3);
+    address[] memory initialMintHooks = new address[](3);
+    initialHats[0] = hat_x_1_1;
+    initialHats[1] = hat_x_1_1_1;
+    initialHats[2] = hat_x_1_1_1_1;
+    initialClaimTypes[0] = MultiClaimsHatter.ClaimType.Claimable;
+    initialClaimTypes[1] = MultiClaimsHatter.ClaimType.ClaimableFor;
+    initialClaimTypes[2] = MultiClaimsHatter.ClaimType.Claimable;
+    initialMintHooks[0] = address(alwaysFailsMintHook);
+    initialMintHooks[1] = address(alwaysSucceedsMintHook);
+    initialMintHooks[2] = address(0);
+    bytes memory initData = abi.encode(initialHats, initialClaimTypes, initialMintHooks);
+
+    vm.expectEmit();
+    emit HatsClaimabilitySet(initialHats, initialClaimTypes);
+    emit MintHookSet(hat_x_1_1, address(alwaysFailsMintHook));
+    emit MintHookSet(hat_x_1_1_1, address(alwaysSucceedsMintHook));
+    instance = MultiClaimsHatter(deployInstance(initData));
+    vm.prank(dao);
+    HATS.mintHat(hat_x_1, address(instance));
+  }
+}
+
+contract TestDeployInstance_WithInitialHatsAndMintHooks is DeployInstance_WithInitialHatsAndMintHooks {
+  function test_reverts_initialization() public {
+    vm.expectRevert("Initializable: contract is already initialized");
+    instance.setUp("");
   }
 }
 

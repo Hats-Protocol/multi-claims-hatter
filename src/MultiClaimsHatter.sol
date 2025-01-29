@@ -109,9 +109,7 @@ contract MultiClaimsHatter is HatsModule {
    * @param _claimType New claimability type for the hat
    */
   function setHatClaimability(uint256 _hatId, ClaimType _claimType) public {
-    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
-
-    hatToClaimType[_hatId] = _claimType;
+    _setHatClaimability(_hatId, _claimType);
 
     emit HatClaimabilitySet(_hatId, _claimType);
   }
@@ -127,11 +125,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    uint256 hatId;
     for (uint256 i; i < length;) {
-      hatId = _hatIds[i];
-      if (!HATS().isAdminOfHat(msg.sender, hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, hatId);
-      hatToClaimType[hatId] = _claimTypes[i];
+      _setHatClaimability(_hatIds[i], _claimTypes[i]);
       unchecked {
         ++i;
       }
@@ -163,9 +158,7 @@ contract MultiClaimsHatter is HatsModule {
     uint256 _hatId,
     ClaimType _claimType
   ) public returns (address _instance) {
-    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
-
-    hatToClaimType[_hatId] = _claimType;
+    _setHatClaimability(_hatId, _claimType);
 
     _instance = _factory.createHatsModule(_implementation, _moduleHatId, _otherImmutableArgs, _initData, _saltNonce);
 
@@ -200,11 +193,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    uint256 hatId;
     for (uint256 i; i < length;) {
-      hatId = _hatIds[i];
-      if (!HATS().isAdminOfHat(msg.sender, hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, hatId);
-      hatToClaimType[hatId] = _claimTypes[i];
+      _setHatClaimability(_hatIds[i], _claimTypes[i]);
       unchecked {
         ++i;
       }
@@ -390,6 +380,14 @@ contract MultiClaimsHatter is HatsModule {
       // false since _wearer is not explicitly eligible
       eligible = false;
     }
+  }
+
+  /// @dev Internal function to set the claimability of a hat, with admin check. Does not emit an event.
+  /// @param _hatId The ID of the hat to set claimability for
+  /// @param _claimType The new claimability type for the hat
+  function _setHatClaimability(uint256 _hatId, ClaimType _claimType) internal {
+    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
+    hatToClaimType[_hatId] = _claimType;
   }
 
   function _setHatsClaimabilityMemory(uint256[] memory _hatIds, ClaimType[] memory _claimTypes) internal {

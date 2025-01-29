@@ -386,7 +386,7 @@ contract MultiClaimsHatter is HatsModule {
   /// @param _hatId The ID of the hat to set claimability for
   /// @param _claimType The new claimability type for the hat
   function _setHatClaimability(uint256 _hatId, ClaimType _claimType) internal {
-    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
+    _checkAdmin(_hatId);
     hatToClaimType[_hatId] = _claimType;
   }
 
@@ -406,5 +406,10 @@ contract MultiClaimsHatter is HatsModule {
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
+  }
+
+  /// @dev Internal function that reverts if the caller is not an admin of a hat
+  function _checkAdmin(uint256 _hatId) internal view {
+    if (!HATS().isAdminOfHat(msg.sender, _hatId)) revert MultiClaimsHatter_NotAdminOfHat(msg.sender, _hatId);
   }
 }

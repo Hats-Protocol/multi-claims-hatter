@@ -15,6 +15,7 @@ contract AlwaysSucceedsMintHook is IHatMintHook {
 
 contract AlwaysFailsMintHook is IHatMintHook {
   mapping(bytes32 hookHash => bool success) public hookResults;
+
   function onHatMinted(uint256, /* hatId */ address, /* to */ bytes calldata /* hookData */ )
     external
     pure

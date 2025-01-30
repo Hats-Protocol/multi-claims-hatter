@@ -83,6 +83,9 @@ contract MultiClaimsHatter is HatsModule {
   /// @notice Maps between hats and their claimability type
   mapping(uint256 hatId => ClaimType claimType) public hatToClaimType;
 
+  /// @notice Maps between hats and their mint hook
+  mapping(uint256 hatId => address mintHook) public hatToMintHook;
+
   /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
   //////////////////////////////////////////////////////////////*/
@@ -135,6 +138,28 @@ contract MultiClaimsHatter is HatsModule {
   }
 
   /**
+   * @notice Change the mint hook for a hat. The caller should be an admin of the hat.
+   * @param _hatId The ID of the hat to set the mint hook for
+   * @param _mintHook The address of the mint hook to set
+   */
+  function setMintHook(uint256 _hatId, address _mintHook) public {
+    _checkAdmin(_hatId);
+    _setMintHook(_hatId, _mintHook);
+  }
+
+  /**
+   * @notice Change the claimability status of a hat and set its mint hook. The caller should be an admin of the hat.
+   * @param _hatId The ID of the hat to set claimability and mint hook for
+   * @param _claimType New claimability type for the hat
+   * @param _mintHook The address of the mint hook to set
+   */
+  function setHatClaimabilityAndMintHook(uint256 _hatId, ClaimType _claimType, address _mintHook) public {
+    _setMintHook(_hatId, _mintHook);
+    _setHatClaimability(_hatId, _claimType);
+    emit HatClaimabilitySet(_hatId, _claimType);
+  }
+
+  /**
    * @notice Change the claimability status of multiple hats. The caller should be an admin of the hats.
    * @param _hatIds The ID of the hat to set claimability for
    * @param _claimTypes New claimability types for each hat
@@ -147,6 +172,49 @@ contract MultiClaimsHatter is HatsModule {
 
     for (uint256 i; i < length;) {
       _setHatClaimability(_hatIds[i], _claimTypes[i]);
+      unchecked {
+        ++i;
+      }
+    }
+
+    emit HatsClaimabilitySet(_hatIds, _claimTypes);
+  }
+
+  function setMintHooks(uint256[] calldata _hatIds, address[] calldata _mintHooks) public {
+    uint256 length = _hatIds.length;
+    if (_mintHooks.length != length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < length;) {
+      _checkAdmin(_hatIds[i]);
+      _setMintHook(_hatIds[i], _mintHooks[i]);
+      unchecked {
+        ++i;
+      }
+    }
+  }
+
+  /**
+   * @notice Change the claimability status of multiple hats and set their mint hooks. The caller should be an admin of
+   * the hats.
+   * @param _hatIds The IDs of the hats to set claimability and mint hook for
+   * @param _claimTypes New claimability types for each hat
+   * @param _mintHooks The addresses of the mint hooks to set for each hat
+   */
+  function setHatsClaimabilityAndMintHooks(
+    uint256[] calldata _hatIds,
+    ClaimType[] calldata _claimTypes,
+    address[] calldata _mintHooks
+  ) public {
+    uint256 length = _hatIds.length;
+    if (_claimTypes.length != length || _mintHooks.length != length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < length;) {
+      _setHatClaimability(_hatIds[i], _claimTypes[i]);
+      _setMintHook(_hatIds[i], _mintHooks[i]);
       unchecked {
         ++i;
       }
@@ -183,6 +251,40 @@ contract MultiClaimsHatter is HatsModule {
     _instance = _factory.createHatsModule(_implementation, _moduleHatId, _otherImmutableArgs, _initData, _saltNonce);
 
     emit HatClaimabilitySet(_hatId, _claimType);
+  }
+
+  /**
+   * @notice Wrapper around a HatsModuleFactory. Deploys a new HatsModule instance and sets a hat's claimability type
+   * and mint hook.
+   * @param _factory The HatsModuleFactory instance that will deploy the modules
+   * @param _implementation The address of the implementation contract of which to deploy a clone
+   * @param _moduleHatId The hat for which to deploy a HatsModule.
+   * @param _otherImmutableArgs Other immutable args to pass to the clone as immutable storage.
+   * @param _initData The encoded data to pass to the `setUp` function of the new HatsModule instance. Leave empty if
+   * none.
+   * @param _saltNonce The nonce to use when calculating the salt
+   * @param _hatId The ID of the hat to set claimability for
+   * @param _claimType New claimability type for the hat
+   * @param _mintHook The address of the mint hook to set
+   * @return _instance The address of the deployed HatsModule instance
+   */
+  function setHatClaimabilityAndMintHookAndCreateModule(
+    HatsModuleFactory _factory,
+    address _implementation,
+    uint256 _moduleHatId,
+    bytes calldata _otherImmutableArgs,
+    bytes calldata _initData,
+    uint256 _saltNonce,
+    uint256 _hatId,
+    ClaimType _claimType,
+    address _mintHook
+  ) public returns (address _instance) {
+    _setHatClaimability(_hatId, _claimType);
+    emit HatClaimabilitySet(_hatId, _claimType);
+
+    _setMintHook(_hatId, _mintHook);
+
+    _instance = _factory.createHatsModule(_implementation, _moduleHatId, _otherImmutableArgs, _initData, _saltNonce);
   }
 
   /**
@@ -225,6 +327,51 @@ contract MultiClaimsHatter is HatsModule {
     );
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
+  }
+
+  /**
+   * @notice Wrapper around a HatsModuleFactory. Deploys new HatsModule instances and sets the claimability type and
+   * mint hooks of multiple hats.
+   * @param _factory The HatsModuleFactory instance that will deploy the modules
+   * @param _implementations The addresses of the implementation contracts of which to deploy a clone
+   * @param _moduleHatIds The hats for which to deploy a HatsModule.
+   * @param _otherImmutableArgsArray Other immutable args to pass to the clones as immutable storage.
+   * @param _initDataArray The encoded data to pass to the `setUp` functions of the new HatsModule instances.
+   * @param _saltNonces The nonces to use when calculating the salt for each module
+   * @param _hatIds The IDs of the hats to set claimability for
+   * @param _claimTypes New claimability types for each hat
+   * @param _mintHooks The addresses of the mint hooks to set for each hat
+   * @return True if all modules were successfully created and the claimability types and mint hooks were set
+   */
+  function setHatsClaimabilityAndMintHooksAndCreateModules(
+    HatsModuleFactory _factory,
+    address[] memory _implementations,
+    uint256[] calldata _moduleHatIds,
+    bytes[] calldata _otherImmutableArgsArray,
+    bytes[] calldata _initDataArray,
+    uint256[] memory _saltNonces,
+    uint256[] memory _hatIds,
+    ClaimType[] memory _claimTypes,
+    address[] memory _mintHooks
+  ) public returns (bool) {
+    uint256 length = _hatIds.length;
+    if (_claimTypes.length != length || _mintHooks.length != length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < length;) {
+      _setHatClaimability(_hatIds[i], _claimTypes[i]);
+      _setMintHook(_hatIds[i], _mintHooks[i]);
+      unchecked {
+        ++i;
+      }
+    }
+
+    emit HatsClaimabilitySet(_hatIds, _claimTypes);
+
+    return _factory.batchCreateHatsModule(
+      _implementations, _moduleHatIds, _otherImmutableArgsArray, _initDataArray, _saltNonces
+    );
   }
 
   /*//////////////////////////////////////////////////////////////

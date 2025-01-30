@@ -8,7 +8,7 @@ import { HatsModuleFactory } from "hats-module/HatsModuleFactory.sol";
 contract DeployInstance is Script {
   address public implementation = 0xB985eA1be961f7c4A4C45504444C02c88c4fdEF9;
   address public instance;
-  HatsModuleFactory public factory = HatsModuleFactory(0xfE661c01891172046feE16D3a57c3Cf456729efA);
+  HatsModuleFactory public factory = HatsModuleFactory(0x0a3f85fa597B6a967271286aA0724811acDF5CD9);
   bytes32 public SALT = bytes32(abi.encode(0x4a75));
   uint256 public SALT_NONCE = 1;
 
@@ -56,7 +56,7 @@ contract DeployImplementation is Script {
 
   // default values
   bool internal _verbose = true;
-  string internal _version = "0.2.0"; // increment this with each new deployment
+  string internal _version = "0.3.0"; // increment this with each new deployment
 
   /// @dev Override default values, if desired
   function prepare(bool verbose, string memory version) public {

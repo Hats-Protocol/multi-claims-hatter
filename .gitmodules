@@ -7,3 +7,6 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
+[submodule "lib/hats-zodiac"]
+	path = lib/hats-zodiac
+	url = https://github.com/hats-protocol/hats-zodiac

@@ -412,6 +412,25 @@ contract MultiClaimsHatter is HatsModule {
   }
 
   /**
+   * @notice Claim multiple hats and call their mint hooks. Will revert if any mint hook fails.
+   * @param _hatIds The IDs of the hats to claim
+   * @param _hookDatas The data to pass to the mint hooks
+   */
+  function claimHatsWithHook(uint256[] calldata _hatIds, bytes[] calldata _hookDatas) public {
+    if (_hatIds.length != _hookDatas.length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < _hatIds.length;) {
+      _claimHatWithHook(_hatIds[i], _hookDatas[i]);
+
+      unchecked {
+        ++i;
+      }
+    }
+  }
+
+  /**
    * @notice Claim a hat on behalf of an account
    * @dev This contract must be wearing an admin hat of the hat to claim or else it will revert
    * @param _hatId The ID of the hat to claim for
@@ -444,6 +463,28 @@ contract MultiClaimsHatter is HatsModule {
 
     for (uint256 i; i < _hatIds.length;) {
       _claimHatFor(_hatIds[i], _accounts[i]);
+
+      unchecked {
+        ++i;
+      }
+    }
+  }
+
+  /**
+   * @notice Claim multiple hats on behalf of accounts and call their mint hooks. Will revert if any mint hook fails.
+   * @param _hatIds The IDs of the hats to claim for
+   * @param _accounts The accounts for which to claim
+   * @param _hookDatas The data to pass to the mint hooks
+   */
+  function claimHatsForWithHooks(uint256[] calldata _hatIds, address[] calldata _accounts, bytes[] calldata _hookDatas)
+    public
+  {
+    if (_hatIds.length != _accounts.length || _hatIds.length != _hookDatas.length) {
+      revert MultiClaimsHatter_ArrayLengthMismatch();
+    }
+
+    for (uint256 i; i < _hatIds.length;) {
+      _claimHatForWithHook(_hatIds[i], _accounts[i], _hookDatas[i]);
 
       unchecked {
         ++i;

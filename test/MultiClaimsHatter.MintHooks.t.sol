@@ -422,3 +422,311 @@ contract TestSetHatsClaimabilityAndMintHooksAndCreateModules is MintHooksTest {
     );
   }
 }
+
+contract TestClaimHatWithHook is MintHooksTest {
+  function setUp() public override {
+    super.setUp();
+    vm.prank(dao);
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable, address(successHook));
+  }
+
+  function test_claimHatWithHook() public {
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1, 1);
+    vm.prank(wearer);
+    instance.claimHatWithHook(hat_x_1_1, "");
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1));
+  }
+
+  function test_reverts_claimHatWithHook_notClaimable() public {
+    // Set hat to not claimable
+    vm.prank(dao);
+    instance.setHatClaimability(hat_x_1_1, MultiClaimsHatter.ClaimType.NotClaimable);
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_HatNotClaimable.selector, hat_x_1_1));
+    instance.claimHatWithHook(hat_x_1_1, "");
+  }
+
+  function test_reverts_claimHatWithHook_notEligible() public {
+    // Change eligibility to always not eligible
+    vm.prank(dao);
+    HATS.changeHatEligibility(hat_x_1_1, address(alwaysNotEligible));
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_NotExplicitlyEligible.selector, wearer, hat_x_1_1));
+    instance.claimHatWithHook(hat_x_1_1, "");
+  }
+
+  function test_reverts_claimHatWithHook_hookFails() public {
+    // Set failing hook
+    vm.prank(dao);
+    instance.setMintHook(hat_x_1_1, address(failHook));
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_MintHookFailed.selector, hat_x_1_1));
+    instance.claimHatWithHook(hat_x_1_1, "");
+  }
+}
+
+contract TestClaimHatsWithHook is MintHooksTest {
+  function setUp() public override {
+    super.setUp();
+    vm.startPrank(dao);
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable, address(successHook));
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1_1, MultiClaimsHatter.ClaimType.Claimable, address(successHook));
+    vm.stopPrank();
+  }
+
+  function test_claimHatsWithHook() public {
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.startPrank(wearer);
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1, 1);
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1_1, 1);
+    instance.claimHatsWithHook(hatIds, hookData);
+    vm.stopPrank();
+
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1));
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1_1));
+  }
+
+  function test_reverts_claimHatsWithHook_arrayLengthMismatch() public {
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    bytes[] memory hookData = new bytes[](1);
+    hookData[0] = "";
+
+    vm.prank(wearer);
+    vm.expectRevert(MultiClaimsHatter_ArrayLengthMismatch.selector);
+    instance.claimHatsWithHook(hatIds, hookData);
+  }
+
+  function test_reverts_claimHatsWithHook_notClaimable() public {
+    // Set one hat to not claimable
+    vm.prank(dao);
+    instance.setHatClaimability(hat_x_1_1, MultiClaimsHatter.ClaimType.NotClaimable);
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_HatNotClaimable.selector, hat_x_1_1));
+    instance.claimHatsWithHook(hatIds, hookData);
+  }
+
+  function test_reverts_claimHatsWithHook_notEligible() public {
+    // Change eligibility to always not eligible for one hat
+    vm.prank(dao);
+    HATS.changeHatEligibility(hat_x_1_1, address(alwaysNotEligible));
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_NotExplicitlyEligible.selector, wearer, hat_x_1_1));
+    instance.claimHatsWithHook(hatIds, hookData);
+  }
+
+  function test_reverts_claimHatsWithHook_hookFails() public {
+    // Set failing hook for one hat
+    vm.prank(dao);
+    instance.setMintHook(hat_x_1_1, address(failHook));
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(wearer);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_MintHookFailed.selector, hat_x_1_1));
+    instance.claimHatsWithHook(hatIds, hookData);
+  }
+}
+
+contract TestClaimHatForWithHook is MintHooksTest {
+  function setUp() public override {
+    super.setUp();
+    vm.prank(dao);
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1, MultiClaimsHatter.ClaimType.ClaimableFor, address(successHook));
+  }
+
+  function test_claimHatForWithHook() public {
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1, 1);
+    vm.prank(dao);
+    instance.claimHatForWithHook(hat_x_1_1, wearer, "");
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1));
+  }
+
+  function test_reverts_claimHatForWithHook_notClaimableFor() public {
+    // Set hat to just Claimable
+    vm.prank(dao);
+    instance.setHatClaimability(hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable);
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_HatNotClaimableFor.selector, hat_x_1_1));
+    instance.claimHatForWithHook(hat_x_1_1, wearer, "");
+  }
+
+  function test_reverts_claimHatForWithHook_notEligible() public {
+    // Change eligibility to always not eligible
+    vm.prank(dao);
+    HATS.changeHatEligibility(hat_x_1_1, address(alwaysNotEligible));
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_NotExplicitlyEligible.selector, wearer, hat_x_1_1));
+    instance.claimHatForWithHook(hat_x_1_1, wearer, "");
+  }
+
+  function test_reverts_claimHatForWithHook_hookFails() public {
+    // Set failing hook
+    vm.prank(dao);
+    instance.setMintHook(hat_x_1_1, address(failHook));
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_MintHookFailed.selector, hat_x_1_1));
+    instance.claimHatForWithHook(hat_x_1_1, wearer, "");
+  }
+}
+
+contract TestClaimHatsForWithHooks is MintHooksTest {
+  function setUp() public override {
+    super.setUp();
+    vm.startPrank(dao);
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1, MultiClaimsHatter.ClaimType.ClaimableFor, address(successHook));
+    instance.setHatClaimabilityAndMintHook(hat_x_1_1_1, MultiClaimsHatter.ClaimType.ClaimableFor, address(successHook));
+    vm.stopPrank();
+  }
+
+  function test_claimHatsForWithHooks() public {
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    address[] memory accounts = new address[](2);
+    accounts[0] = wearer;
+    accounts[1] = wearer;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.startPrank(dao);
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1, 1);
+    vm.expectEmit();
+    emit TransferSingle(address(instance), address(0), wearer, hat_x_1_1_1, 1);
+    instance.claimHatsForWithHooks(hatIds, accounts, hookData);
+    vm.stopPrank();
+
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1));
+    assertTrue(HATS.isWearerOfHat(wearer, hat_x_1_1_1));
+  }
+
+  function test_reverts_claimHatsForWithHooks_arrayLengthMismatch() public {
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    address[] memory accounts = new address[](2);
+    accounts[0] = wearer;
+    accounts[1] = wearer;
+
+    bytes[] memory hookData = new bytes[](1);
+    hookData[0] = "";
+
+    vm.prank(dao);
+    vm.expectRevert(MultiClaimsHatter_ArrayLengthMismatch.selector);
+    instance.claimHatsForWithHooks(hatIds, accounts, hookData);
+  }
+
+  function test_reverts_claimHatsForWithHooks_notClaimableFor() public {
+    // Set one hat to just Claimable
+    vm.prank(dao);
+    instance.setHatClaimability(hat_x_1_1, MultiClaimsHatter.ClaimType.Claimable);
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    address[] memory accounts = new address[](2);
+    accounts[0] = wearer;
+    accounts[1] = wearer;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_HatNotClaimableFor.selector, hat_x_1_1));
+    instance.claimHatsForWithHooks(hatIds, accounts, hookData);
+  }
+
+  function test_reverts_claimHatsForWithHooks_notEligible() public {
+    // Change eligibility to always not eligible for one hat
+    vm.prank(dao);
+    HATS.changeHatEligibility(hat_x_1_1, address(alwaysNotEligible));
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    address[] memory accounts = new address[](2);
+    accounts[0] = wearer;
+    accounts[1] = wearer;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_NotExplicitlyEligible.selector, wearer, hat_x_1_1));
+    instance.claimHatsForWithHooks(hatIds, accounts, hookData);
+  }
+
+  function test_reverts_claimHatsForWithHooks_hookFails() public {
+    // Set failing hook for one hat
+    vm.prank(dao);
+    instance.setMintHook(hat_x_1_1, address(failHook));
+
+    uint256[] memory hatIds = new uint256[](2);
+    hatIds[0] = hat_x_1_1;
+    hatIds[1] = hat_x_1_1_1;
+
+    address[] memory accounts = new address[](2);
+    accounts[0] = wearer;
+    accounts[1] = wearer;
+
+    bytes[] memory hookData = new bytes[](2);
+    hookData[0] = "";
+    hookData[1] = "";
+
+    vm.prank(dao);
+    vm.expectRevert(abi.encodeWithSelector(MultiClaimsHatter_MintHookFailed.selector, hat_x_1_1));
+    instance.claimHatsForWithHooks(hatIds, accounts, hookData);
+  }
+}

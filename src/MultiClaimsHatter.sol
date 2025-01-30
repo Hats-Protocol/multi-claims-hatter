@@ -656,7 +656,6 @@ contract MultiClaimsHatter is HatsModule {
   }
 
   function _setMintHooksMemory(uint256[] memory _hatIds, address[] memory _mintHooks) internal {
-    console2.log("setting mint hooks");
     uint256 length = _hatIds.length;
     if (_mintHooks.length != length) {
       revert MultiClaimsHatter_ArrayLengthMismatch();
@@ -665,11 +664,7 @@ contract MultiClaimsHatter is HatsModule {
     for (uint256 i; i < length;) {
       // set the mint hook if it is not the zero address
       if (_mintHooks[i] != address(0)) {
-        console2.log("setting mint hook for hat", _hatIds[i]);
         _setMintHook(_hatIds[i], _mintHooks[i]);
-      }
-      unchecked {
-        ++i;
       }
     }
   }

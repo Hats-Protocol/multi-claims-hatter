@@ -516,6 +516,8 @@ contract MultiClaimsHatter is HatsModule {
                         INTERNAL FUNCTIONS
   //////////////////////////////////////////////////////////////*/
 
+  /// @dev Internal function to mint a hat to an account.
+  /// @dev Reverts if the account is not explicitly eligible for the hat.
   function _mint(uint256 _hatId, address _account) internal {
     // revert if _wearer is not explicitly eligible
     if (!_isExplicitlyEligible(_hatId, _account)) revert MultiClaimsHatter_NotExplicitlyEligible(_account, _hatId);
@@ -523,12 +525,16 @@ contract MultiClaimsHatter is HatsModule {
     HATS().mintHat(_hatId, _account);
   }
 
+  /// @dev Internal function to call a mint hook.
+  /// @dev Reverts if the mint hook fails.
   function _callMintHook(uint256 _hatId, address _account, bytes calldata _hookData) internal {
     if (!IHatMintHook(hatToMintHook[_hatId]).onHatMinted(_hatId, _account, _hookData)) {
       revert MultiClaimsHatter_MintHookFailed(_hatId);
     }
   }
 
+  /// @dev Internal function to claim a hat.
+  /// @dev Reverts if the hat is not claimable.
   function _claimHat(uint256 _hatId) internal {
     if (hatToClaimType[_hatId] == ClaimType.NotClaimable) {
       revert MultiClaimsHatter_HatNotClaimable(_hatId);
@@ -537,11 +543,15 @@ contract MultiClaimsHatter is HatsModule {
     _mint(_hatId, msg.sender);
   }
 
+  /// @dev Internal function to claim a hat and call its mint hook.
+  /// @dev Reverts if the hat is not claimable or the mint hook fails.
   function _claimHatWithHook(uint256 _hatId, bytes calldata _hookData) internal {
     _claimHat(_hatId);
     _callMintHook(_hatId, msg.sender, _hookData);
   }
 
+  /// @dev Internal function to claim a hat for an account.
+  /// @dev Reverts if the hat is not claimable for the account.
   function _claimHatFor(uint256 _hatId, address _account) internal {
     if (hatToClaimType[_hatId] != ClaimType.ClaimableFor) {
       revert MultiClaimsHatter_HatNotClaimableFor(_hatId);
@@ -550,11 +560,15 @@ contract MultiClaimsHatter is HatsModule {
     _mint(_hatId, _account);
   }
 
+  /// @dev Internal function to claim a hat for an account and call its mint hook.
+  /// @dev Reverts if the hat is not claimable for the account or the mint hook fails.
   function _claimHatForWithHook(uint256 _hatId, address _account, bytes calldata _hookData) internal {
     _claimHatFor(_hatId, _account);
     _callMintHook(_hatId, _account, _hookData);
   }
 
+  /// @dev Internal function to check if an account is explicitly eligible for a hat.
+  /// @dev Returns true if the account is explicitly eligible, false otherwise.
   function _isExplicitlyEligible(uint256 _hatId, address _account) internal view returns (bool eligible) {
     // get the hat's eligibility module address
     address eligibility = HATS().getHatEligibilityModule(_hatId);
@@ -598,7 +612,8 @@ contract MultiClaimsHatter is HatsModule {
     hatToClaimType[_hatId] = _claimType;
   }
 
-  /// @dev Internal function to set the mint hook of a hat, without admin check. Does emit an event.
+  /// @dev Internal function to set the mint hook of a hat, without admin check. Emits an event to log the hook set.
+  /// @dev Setting a mint hook to the zero address will remove hook functionality for the hat.
   /// @param _hatId The ID of the hat to set the mint hook for
   /// @param _mintHook The address of the mint hook to set
   function _setMintHook(uint256 _hatId, address _mintHook) internal {
@@ -606,6 +621,10 @@ contract MultiClaimsHatter is HatsModule {
     emit MintHookSet(_hatId, _mintHook);
   }
 
+  /// @dev Internal function to set the claimability of multiple hats, using memory arrays.
+  /// @dev Does not perform an admin check. Reverts if the arrays are not of equal length.
+  /// @param _hatIds The IDs of the hats to set the claimability for
+  /// @param _claimTypes The new claimability types for the hats
   function _setHatsClaimabilityMemory(uint256[] memory _hatIds, ClaimType[] memory _claimTypes) internal {
     uint256 length = _hatIds.length;
     if (_claimTypes.length != length) {
@@ -621,6 +640,11 @@ contract MultiClaimsHatter is HatsModule {
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
   }
 
+  /// @dev Internal function to set the mint hooks of multiple hats, using memory arrays.
+  /// @dev Does not perform an admin check. Reverts if the arrays are not of equal length.
+  /// @param _hatIds The IDs of the hats to set the mint hooks for
+  /// @param _mintHooks The addresses of the mint hooks to set
+  /// @dev Setting a mint hook to the zero address will remove hook functionality for the hat.
   function _setMintHooksMemory(uint256[] memory _hatIds, address[] memory _mintHooks) internal {
     uint256 length = _hatIds.length;
     if (_mintHooks.length != length) {

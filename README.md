@@ -79,6 +79,20 @@ In some cases, it may be desirable to allow a third party — such as a bot netw
 
 Once set, anybody can then claim on behalf of eligible wearer/s by calling the `claimHatFor` or `claimHatsFor` functions, with the desired wearer/s and hat/s as arguments.
 
+### Hooks
+
+MultiClaimsHatter supports optional mint hooks for claimable hats. These hooks are called when a hat is claimed, and can be used to bundle additional logic with the claim.
+
+A mint hook is a contract that implements the [IHatMintHook](../src/Interfaces/IHatMintHook.sol) interface:
+
+```solidity
+interface IHatMintHook {
+  function onHatMinted(uint256 _hatId, address _wearer, bytes calldata _hookData) external returns (bool success);
+}
+```
+
+The `onHatMinted` function is called when a hat is claimed, and executes the logic of the hook. It returns a boolean indicating whether the hook was successful. If the hook fails, the claim will revert.
+
 ## Development
 
 This repo uses Foundry for development and testing. To get started:

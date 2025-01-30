@@ -170,11 +170,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       _setHatClaimability(_hatIds[i], _claimTypes[i]);
-      unchecked {
-        ++i;
-      }
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
@@ -186,12 +183,9 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       _checkAdmin(_hatIds[i]);
       _setMintHook(_hatIds[i], _mintHooks[i]);
-      unchecked {
-        ++i;
-      }
     }
   }
 
@@ -212,12 +206,9 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       _setHatClaimability(_hatIds[i], _claimTypes[i]);
       _setMintHook(_hatIds[i], _mintHooks[i]);
-      unchecked {
-        ++i;
-      }
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
@@ -315,11 +306,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       _setHatClaimability(_hatIds[i], _claimTypes[i]);
-      unchecked {
-        ++i;
-      }
     }
 
     success = _factory.batchCreateHatsModule(
@@ -359,12 +347,9 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       _setHatClaimability(_hatIds[i], _claimTypes[i]);
       _setMintHook(_hatIds[i], _mintHooks[i]);
-      unchecked {
-        ++i;
-      }
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
@@ -402,12 +387,8 @@ contract MultiClaimsHatter is HatsModule {
    * @param _hatIds The IDs of the hats to claim
    */
   function claimHats(uint256[] calldata _hatIds) public {
-    for (uint256 i; i < _hatIds.length;) {
+    for (uint256 i; i < _hatIds.length; ++i) {
       _claimHat(_hatIds[i]);
-
-      unchecked {
-        ++i;
-      }
     }
   }
 
@@ -421,12 +402,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < _hatIds.length;) {
+    for (uint256 i; i < _hatIds.length; ++i) {
       _claimHatWithHook(_hatIds[i], _hookDatas[i]);
-
-      unchecked {
-        ++i;
-      }
     }
   }
 
@@ -461,12 +438,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < _hatIds.length;) {
+    for (uint256 i; i < _hatIds.length; ++i) {
       _claimHatFor(_hatIds[i], _accounts[i]);
-
-      unchecked {
-        ++i;
-      }
     }
   }
 
@@ -483,12 +456,8 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < _hatIds.length;) {
+    for (uint256 i; i < _hatIds.length; ++i) {
       _claimHatForWithHook(_hatIds[i], _accounts[i], _hookDatas[i]);
-
-      unchecked {
-        ++i;
-      }
     }
   }
 
@@ -644,12 +613,9 @@ contract MultiClaimsHatter is HatsModule {
     }
 
     uint256 hatId;
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       hatId = _hatIds[i];
       hatToClaimType[hatId] = _claimTypes[i];
-      unchecked {
-        ++i;
-      }
     }
 
     emit HatsClaimabilitySet(_hatIds, _claimTypes);
@@ -661,7 +627,7 @@ contract MultiClaimsHatter is HatsModule {
       revert MultiClaimsHatter_ArrayLengthMismatch();
     }
 
-    for (uint256 i; i < length;) {
+    for (uint256 i; i < length; ++i) {
       // set the mint hook if it is not the zero address
       if (_mintHooks[i] != address(0)) {
         _setMintHook(_hatIds[i], _mintHooks[i]);

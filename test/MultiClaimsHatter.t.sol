@@ -16,8 +16,7 @@ import { AlwaysSucceedsMintHook, AlwaysFailsMintHook } from "./utils/TestMintHoo
 
 contract Setup is DeployImplementation, Test {
   uint256 public fork;
-  // the block number where hats module factory was deployed on Sepolia
-  uint256 public constant BLOCK_NUMBER = 5_516_083;
+  uint256 public constant BLOCK_NUMBER = 7_294_314;
   IHats public constant HATS = IHats(0x3bc1A0Ad72417f2d411118085256fC53CBdDd137); // v1.hatsprotocol.eth
   HatsModuleFactory public constant FACTORY = HatsModuleFactory(0x0a3f85fa597B6a967271286aA0724811acDF5CD9);
 
@@ -84,11 +83,14 @@ contract Setup is DeployImplementation, Test {
   //////////////////////////////////////////////////////////////*/
 
 contract DeployInstance_WithoutInitialHats is Setup {
+  address public alwaysEligibleModule;
+  address public alwaysNotEligibleModule;
+
   function setUp() public virtual override {
     super.setUp();
 
-    address alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
-    address alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
+    alwaysEligibleModule = address(new TestEligibilityAlwaysEligible("test"));
+    alwaysNotEligibleModule = address(new TestEligibilityAlwaysNotEligible("test"));
 
     vm.startPrank(dao);
     HATS.changeHatEligibility(hat_x_1_1, alwaysEligibleModule);
